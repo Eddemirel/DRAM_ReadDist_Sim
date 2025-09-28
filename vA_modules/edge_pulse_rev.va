@@ -1,0 +1,136 @@
+`include "constants.vams"
+`include "disciplines.vams"
+
+/* --------------------------------------------------------------------------
+   DRAM-style Edge-Pulse Driver
+   Pins   :  A  P  SN  BL  REF
+   Defaults: see parameter list
+   NOTE: Only pin & parameter configuration is supplied here; insert your
+   analog behaviour after the placeholder block.
+   --------------------------------------------------------------------------*/
+(* xyceDeviceName = "Edge-Pulse Driver" *)
+module edge_pulse_drv (A, P, SN, BL);
+  // ---------- Ports --------------------------------------------------------
+  inout A, P, SN, BL;        // treat all as electrical for now
+  electrical A, P, SN, BL;
+
+  // ---------- Instance parameters -----------------------------------------
+  //   Attribute legend:
+  //     desc  – brief description (used in Xyce docs)
+  //     units – physical units where recognised by Xyce
+  //     type  – "instance" because each driver may vary
+
+
+  (* desc = "Main decay time constant (double-10)",          type = "instance" *)
+  parameter real tau_double_10       = 10n    from (0:inf);
+
+  (* desc = "Trap-assisted decay tau (single-10)",           type = "instance" *)
+  parameter real tau_single_10  = 100n   from (0:inf);
+
+  (* desc = "Fall-edge multiplier (double-10)",              type = "instance" *)
+  parameter real k_double_10 = 2.0    from (0:inf);
+
+  (* desc = "Exponent (10-variant)",                    type = "instance" *)
+  parameter real k_mult_10     = 2    from (0:inf);
+
+  (* desc = "Injected current magnitude (double-10)", units = "A", type = "instance" *)
+  parameter real I_double_10     = 1n     from (0:inf);
+
+  (* desc = "Trap current magnitude (single-10)",    units = "A", type = "instance" *)
+  parameter real I_single_10    = 0.5n    from (0:inf);
+
+  (* desc = "Passing-WL leakage current (const-10)", units = "A", type = "instance" *)
+  parameter real I_const_10    = 10p     from (0:inf);
+
+  (* desc = "Sigmoid slope factor (renamed k_switch)",          type = "instance" *)
+  parameter real k_switch       = 20.0    from (0:inf);
+
+  (* desc = "Pulling current magnitude (single-01)", units = "A", type = "instance" *)
+  parameter real I_single_01    = 0.5n    from (0:inf);
+
+  (* desc = "AWL constant current magnitude (const-01)", units = "A", type = "instance" *)
+  parameter real I_const_01     = 0.5n    from (0:inf);
+
+  (* desc = "AWL multiplier (01-variant)",                    type = "instance" *)
+  parameter real k_mult_01      = 2.0    from (0:inf);
+
+  (* desc = "Pulling time constant (single-01)",             type = "instance" *)
+  parameter real tau_single_01     = 10n    from (0:inf);
+  
+  (* desc = "Main decay time constant (double-01)",          type = "instance" *)
+  parameter real tau_double_01       = 10n    from (0:inf);
+
+  (* desc = "Fall-edge multiplier (double-01)",              type = "instance" *)
+  parameter real k_double_01 = 2.0    from (0:inf);
+
+  (* desc = "Injected current magnitude (double-01)", units = "A", type = "instance" *)
+  parameter real I_double_01     = 1n     from (0:inf);
+  // ---------- State / one-time initialisation placeholders -----------------
+  // Declare any globals here if your analog code needs them.
+  // Example:
+  //   real t_last_edge, v_prev;
+  //
+  // Bias-independent work should go in @(initial_instance) as per the Guide.
+
+  // Internal state variables
+  real vA_prev;   // previous value of V(A)
+  real vP_prev;   // previous value of V(P)
+  real t_edge;    // time of last falling edge of V(A)
+  real t_pedge;   // time of last falling edge of V(P)-------------------------------------------------------------------
+
+analog begin : main
+
+`ifdef insideADMS
+  @(initial_instance)
+`endif
+  begin : init_instance
+      vA_prev = 0.0;
+      vP_prev = 0.0;
+      t_edge = -1.0;
+      t_pedge = -1.0;
+  end 
+  // Continuous-time behaviour
+
+    // Falling-edge detector for V(A)
+    real vA_now, dt_edge;
+    vA_now = V(A);
+    if ((vA_now < 1.25) && (vA_prev >= 1.25)) begin
+      t_edge = $abstime;           // latch time of A falling edge
+    end
+    vA_prev = vA_now;              // update previous sample
+    dt_edge = $abstime - t_edge;
+
+    // Falling-edge detector for V(P)
+    real vP_now, dt_pedge;
+    vP_now = V(P);
+    if ((vP_now < 1.25) && (vP_prev >= 1.25)) begin
+      t_pedge = $abstime;          // latch time of P falling edge
+    end
+    vP_prev = vP_now;              // update previous sample
+    dt_pedge = $abstime - t_pedge;
+    
+
+    I(SN,BL) <+ (
+      (
+        (
+          I_double_10 * (exp(-dt_edge/(k_double_10*tau_double_10)) - exp(-dt_edge/tau_double_10))
+        + I_single_10 * exp(-dt_edge/tau_single_10)
+        ) * (V(A) < 0.1) * (1 + k_mult_10 * (V(P) > 0.1))
+        + I_const_10 * (V(P) > 0.1)
+      ) * (dt_edge > 0)
+    ) / (1 + exp(-k_switch * (V(SN) - 0.9)));
+
+    // second (P-active) half — symmetrized to match the structure above
+    I(SN,BL) <+ -(
+      (
+        (
+          I_double_01 * (exp(-dt_pedge/(k_double_01*tau_double_01)) - exp(-dt_pedge/tau_double_01))
+        + I_single_01 * exp(-dt_pedge/tau_single_01)
+        ) * (V(P) < 0.1) * (1 + k_mult_01 * (V(A) > 0.1))
+        + I_const_01 * (V(A) > 0.1)
+      ) * (dt_pedge > 0)
+    ) / (1 + exp(-k_switch * (0.3 - V(SN))));
+
+
+    end
+endmodule

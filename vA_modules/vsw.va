@@ -1,0 +1,23 @@
+
+`include "constants.vams"
+`include "disciplines.vams"
+
+module vsw(nplus, nminus, cplus, cminus);
+  inout nplus, nminus, cplus, cminus;
+  electrical nplus, nminus, cplus, cminus;
+
+(* desc="On resistance", type="instance" *) parameter real Ron = 0;
+(* desc="Off resistance", type="instance" *) parameter real Roff = 0;
+//(* desc="On resistance", type="instance" *) parameter real Gon = 0.1;
+//(* desc="Off resistance", type="instance" *) parameter real Goff = 1e-15;
+(* desc="Threshold voltage", type="instance" *) parameter real Vtn = 0;
+(* desc="Sigmoid slope", type="instance" *) parameter real slope = 0;
+
+  analog begin
+    real Rval;
+    Rval = Ron + (Roff - Ron) / (1 + exp(slope * ( V(cplus, cminus) - Vtn)));
+    I(nplus, nminus) <+ V(nplus, nminus) / Rval;
+    //I(nplus, nminus) <+ V(nplus, nminus) * (Goff + Gon / (1 + exp(slope * ( V(cplus, cminus) - Vtn))));
+  end
+
+endmodule

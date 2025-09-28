@@ -1,0 +1,47 @@
+`include "constants.vams"
+`include "disciplines.vams"
+
+module senseamp(EQ, VSS, SAE, SAEd, VDD, VPRE, W, WE, WI, BL, BLI);
+  inout EQ, VSS, SAE, SAEd, VDD, VPRE, W, WE, WI, BL, BLI;
+  electrical EQ, VSS, SAE, SAEd, VDD, VPRE, W, WE, WI, BL, BLI, SN, SP;
+
+    (* type="instance" *) parameter real Ron = 1e2;
+    (* type="instance" *) parameter real Roff = 1e15;
+    (* type="instance" *) parameter real Vt_SA = 0.2;
+    (* type="instance" *) parameter real slope = 50;
+    (* type="instance" *) parameter real C_SA = 5e-15;
+
+  analog begin
+    // Capacitive loading
+    I(BL, VSS)  <+ ddt(C_SA * V(BL, VSS));
+    I(BLI, VSS) <+ ddt(C_SA * V(BLI, VSS));
+    I(SN, VSS)  <+ ddt(C_SA * V(SN, VSS));
+    I(SP, VSS)  <+ ddt(C_SA * V(SP, VSS));
+
+    // XS1/XS2 (cross-coupled feedback)
+    I(SN, BL) <+ V(SN, BL) / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(BLI, SN) - Vt_SA))));
+    I(SN, BLI) <+ V(SN, BLI) / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(BL,SN) - Vt_SA))));
+
+    // XS3/XS4 (feedback to SP)
+    I(BLI, SP) <+ V(BLI, SP)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(SP, BL) - Vt_SA))));
+    I(BL, SP)  <+ V(BL, SP)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(SP, BLI) - Vt_SA))));
+
+    // XS5/XS6/XS7 (PRE driver)
+    I(VPRE, BL)  <+ V(VPRE, BL)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(EQ, VPRE) - Vt_SA))));
+    I(VPRE, BLI) <+ V(VPRE, BLI)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(EQ, VPRE) - Vt_SA))));
+    I(BL, BLI) <+ V(BL, BLI)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(EQ, VSS) - Vt_SA))));
+
+    // XS8/XS9 (write paths)
+    I(W, BL)  <+ V(W, BL)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(WE, VSS) - Vt_SA))));
+    I(WI, BLI) <+ V(WI, BLI)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(WE, VSS) - Vt_SA))));
+
+    // XS12/XS13 (pull-down latch - SN)
+    I(VSS, SN) <+ V(VSS, SN)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(SAE, VSS) - Vt_SA))));
+    I(SN, VPRE) <+ V(SN, VPRE)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(VPRE, SAE) - Vt_SA))));
+    
+    // XS14/XS15 (pull-up latch - SP)
+    I(SP, VDD) <+ V(SP, VDD)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(VDD, SAEd) - Vt_SA))));
+    I(VPRE, SP) <+ V(VPRE, SP)  / ( Ron + (Roff - Ron) /(1 + limexp(slope * (V(SAEd, VPRE) - Vt_SA))));
+  end
+
+endmodule

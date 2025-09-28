@@ -1,0 +1,36 @@
+`include "constants.vams"
+`include "disciplines.vams"
+
+module IsubModule(BL, SN, WL, B);
+  inout BL, SN, WL, B;
+  electrical BL, SN, WL, B;
+
+  // Instance parameters
+  (* type="instance" *) parameter real n     = 1.5;
+  (* type="instance" *) parameter real GAMMA = 0.4;
+  (* type="instance" *) parameter real PHI   = 0.8;
+  (* type="instance" *) parameter real I0    = 1e-9;
+  (* type="instance" *) parameter real VTH0  = 0.7;
+  (* type="instance" *) parameter real Ron   = 1e2;
+  (* type="instance" *) parameter real Roff  = 1e15;
+  (* type="instance" *) parameter real slope = 40.0;
+
+  analog begin
+
+    real Vds, Vsb, Vgs, Vth, kTq;
+    if (V(BL, SN) > 0) begin
+      Vds = 1;
+      Vsb = V(SN, B);
+      Vgs = V(WL, SN);
+    end else begin
+      Vds = -1;
+      Vsb = V(BL, B);
+      Vgs = V(WL, BL);
+    end  
+    kTq = (0.0259 / 300) * $temperature; // Thermal voltage at given temp
+    Vth = VTH0 + GAMMA * (sqrt(2 * PHI + Vsb) - sqrt(2 * PHI));
+
+    I(BL,SN) <+ min(I0 * (exp((Vgs - Vth) / (n * kTq)))* (1 - exp(-Vds * V(BL,SN) / kTq)), 1/Ron)*Vds;
+    I(BL,SN) <+ V(BL,SN) / (Ron + (Roff - Ron) / (1 + exp(slope * ( Vgs - Vth))));
+  end
+endmodule

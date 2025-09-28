@@ -1,0 +1,28 @@
+
+*--------------------------------DRAM CELL ----------------------------------------------------
+.SUBCKT dram_cell BL_in VSS WL_in BB_n BB_p BL_out SN WL_out WW_n WW_p AWL PWL PARAMS: Roff=Roff Ron=Ron
++R_sn=R_sn C_ns=C_sn R_bl=R_bl C_bl=C_bl R_wl=R_wl C_wl=C_wl C_bl2bl=C_bl2bl C_wl2wl=C_wl2wl C_wl2bl=C_wl2bl
++I0=I0 VTH0=VTH0
++I_double_10=I_double_10 I_single_10=I_single_10 I_const_10=I_const_10 tau_double_10=tau_double_10 tau_single_10=tau_single_10 k_double_10=k_double_10 k_mult_10=k_mult_10 k_switch=k_switch
++I_double_01=I_double_01 I_single_01=I_single_01 I_const_01=I_const_01 tau_double_01=tau_double_01 tau_single_01=tau_single_01 k_double_01=k_double_01 k_mult_01=k_mult_01
+
+C1 N001 VSS {C_sn} ic=0.6
+R1 BL_out BL_in {R_bl}
+C2 BL_out VSS {C_bl} ic=0.6
+C3 WL_out VSS {C_wl} ic=0
+R2 WL_out WL_in {R_wl}
+C5 BB_p BL_out {C_bl2bl} ic=0
+C6 WW_p WL_in {C_wl2wl} ic=0
+C8 BL_in WL_out {C_wl2bl} ic=0
+C4 WW_n WL_in {C_wl2wl} ic=0
+C7 BB_n BL_out {C_bl2bl} ic=0
+R3 SN N001 {R_sn}
+
+* 1) Subthreshold leakage model (IsubModule)
+YIsubModule S1 BL_in SN WL_out 0 I0=I0 VTH0=VTH0 Roff=Roff Ron=Ron
+
+* 2) Charge pulse model (ChargeModule)
+Yedge_pulse_drv pulse1 AWL PWL SN BL_in I_double_10=I_double_10 I_single_10=I_single_10 I_const_10=I_const_10 tau_double_10=tau_double_10 tau_single_10=tau_single_10 k_double_10=k_double_10 k_mult_10=k_mult_10 k_switch=k_switch
+ +I_double_01=I_double_01 I_single_01=I_single_01 I_const_01=I_const_01 tau_double_01=tau_double_01 tau_single_01=tau_single_01 k_double_01=k_double_01 k_mult_01=k_mult_01
+
+.ENDS dram_cell
