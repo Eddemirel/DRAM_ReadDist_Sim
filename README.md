@@ -40,7 +40,9 @@ python3 config.py
 
 ### Outputs:
 MC_<attack_type>_<hammer_count>HC_<N>samples_<timestamp>/
+
    ├─ waveforms/
+   
    └─ varation_table.csv (or similar)
 
 
